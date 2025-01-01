@@ -56,9 +56,17 @@ export function JournalCreate() {
 export function JournalList() {
   const { accounts, getProgramAccount } = useJournalProgram()
 
+  console.log('Accounts query state:', {
+    isLoading: accounts.isLoading,
+    isError: accounts.isError,
+    data: accounts.data,
+    error: accounts.error
+  });
+
   if (getProgramAccount.isLoading) {
     return <span className="loading loading-spinner loading-lg"></span>
   }
+  
   if (!getProgramAccount.data?.value) {
     return (
       <div className="alert alert-info flex justify-center">
@@ -66,22 +74,29 @@ export function JournalList() {
       </div>
     )
   }
+
+  if (accounts.isLoading) {
+    return <span className="loading loading-spinner loading-lg"></span>
+  }
+
+  if (accounts.isError) {
+    return <div className="alert alert-error">Error loading accounts: {accounts.error?.message}</div>
+  }
+
+  if (!accounts.data?.length) {
+    return (
+      <div className="text-center">
+        <h2 className={'text-2xl'}>No accounts</h2>
+        No accounts found. Create one above to get started.
+      </div>
+    )
+  }
+
   return (
-    <div className={'space-y-6'}>
-      {accounts.isLoading ? (
-        <span className="loading loading-spinner loading-lg"></span>
-      ) : accounts.data?.length ? (
-        <div className="grid md:grid-cols-2 gap-4">
-          {accounts.data?.map((account) => (
-            <JournalCard key={account.publicKey.toString()} account={account.publicKey} />
-          ))}
-        </div>
-      ) : (
-        <div className="text-center">
-          <h2 className={'text-2xl'}>No accounts</h2>
-          No accounts found. Create one above to get started.
-        </div>
-      )}
+    <div className="grid md:grid-cols-2 gap-4">
+      {accounts.data.map((account) => (
+        <JournalCard key={account.publicKey.toString()} account={account.publicKey} />
+      ))}
     </div>
   )
 }
@@ -90,52 +105,50 @@ function JournalCard({ account }: { account: PublicKey }) {
   const { accountQuery, updateEntry, deleteEntry } = useJournalProgramAccount({
     account,
   });
-
   const { publicKey } = useWallet();
   const [message, setMessage] = useState('');
 
-  const isFormValid = message.trim() !== '';
+  // Add debug logging
+  console.log('Account Query Data:', accountQuery.data);
 
-  const title = accountQuery.data?.title;
-
-  const handleSubmit = () => {
-    if (publicKey && isFormValid && title) {
-      updateEntry.mutateAsync({title, message, owner: publicKey})
-    }
-  };
-
-  if (!publicKey) {
-    return <p> Connect your wallet </p>
+  if (accountQuery.isLoading) {
+    return <span className="loading loading-spinner loading-lg"></span>
   }
 
-  if (!isFormValid) {
-    return <p> Please fill out the form </p>
-  }  
+  if (!accountQuery.data) {
+    return null;
+  }
 
-  return accountQuery.isLoading ? (
-    <span className="loading loading-spinner loading-lg"></span>
-  ) : (
+  return (
     <div className="card card-bordered border-base-300 border-4 text-neutral-content">
       <div className="card-body items-center text-center">
         <div className="space-y-6">
           <h2 className="card-title justify-center text-3xl cursor-pointer" onClick={() => accountQuery.refetch()}>
-            {accountQuery.data?.title}
+            {accountQuery.data.title}
           </h2>
-          <p>{accountQuery.data?.message}</p>
+          <p>{accountQuery.data.message}</p>
           <div className="card-actions justify-around">
-          <textarea
-            placeholder="New Message"
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            className="textarea textarea-bordered w-full max-w-xs"
-          />
-          <button
-            className="btn btn-xs lg:btn-md btn-primary"
-            onClick={handleSubmit}
-            disabled={updateEntry.isPending || !isFormValid || !publicKey}
-          >
-        Update
-      </button>
+            <textarea
+              placeholder="New Message"
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              className="textarea textarea-bordered w-full max-w-xs"
+            />
+            <button
+              className="btn btn-xs lg:btn-md btn-primary"
+              onClick={() => {
+                if (publicKey && message.trim() && accountQuery.data?.title) {
+                  updateEntry.mutateAsync({
+                    title: accountQuery.data.title,
+                    message,
+                    owner: publicKey
+                  })
+                }
+              }}
+              disabled={updateEntry.isPending || !message.trim() || !publicKey}
+            >
+              Update
+            </button>
           </div>
           <div className="text-center space-y-4">
             <p>

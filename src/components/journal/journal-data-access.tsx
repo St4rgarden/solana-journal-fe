@@ -26,7 +26,12 @@ export function useJournalProgram() {
 
   const accounts = useQuery({
     queryKey: ['journal', 'all', { cluster }],
-    queryFn: () => program.account.journalEntryState.all(),
+    queryFn: async () => {
+      console.log('Fetching journal accounts...');
+      const result = await program.account.journalEntryState.all();
+      console.log('Journal accounts result:', result);
+      return result;
+    },
   })
 
   const getProgramAccount = useQuery({
@@ -39,10 +44,14 @@ export function useJournalProgram() {
     // mutationFn: (keypair: Keypair) => this would automatically generate the keypair from the app
     // but we want to use a connected wallet keypair here:
     mutationFn: async ({title, message, owner}) => {
-      const journalEntryAddress = await PublicKey.findProgramAddress(
+      console.log("here?")
+      console.log(owner.toString())
+      const journalEntryAddress = PublicKey.findProgramAddressSync(
         // Here we derive the address of the journal entry data account like in lib.rs from title and owner key
         [Buffer.from(title), owner.toBuffer()], programId,
       );
+      console.log('Journal entry address:', journalEntryAddress.toString());
+      console.log('Program ID:', programId.toString());
       return program.methods.createEntry(title, message).accounts({journalEntry: journalEntryAddress}).rpc()
     },
 
